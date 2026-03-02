@@ -1,10 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+import os
 
 # ================= 配置区 =================
-FEISHU_WEBHOOK = "https://open.feishu.cn/open-apis/bot/v2/hook/68602ab2-f6fd-4d40-a0f3-d6723288454d"
-LLM_API_KEY = "sk-covvumujujuugkenewczvtslgsulnsmbzkfneklrboywapxd"
+FEISHU_WEBHOOK = os.getenv("FEISHU_WEBHOOK")
+LLM_API_KEY = os.getenv("LLM_API_KEY")
 LLM_BASE_URL = "https://api.siliconflow.cn/v1" 
 TARGET_URL = "https://36kr.com/information/AI/"
 
