@@ -55,7 +55,15 @@ def parse_llm_output_to_feishu_post(llm_text, section_title):
         content_blocks.append([
             {
                 "tag": "text",
-                "text": f"{summary}\n"
+                "text": f"{summary}"
+            }
+        ])
+
+        # 空行分隔每条新闻/项目
+        content_blocks.append([
+            {
+                "tag": "text",
+                "text": "\n"
             }
         ])
 
@@ -111,7 +119,8 @@ def filter_and_summarize_with_ai(articles):
     输出要求：
     1. 项目整理格式：[序号.][匹配的Emoji][标题] + [链接] + [概况]
     2. 概况要求：根据新闻标题及摘要总结新闻价值，字数在 30 字以内。
-    3. 严格参考以下格式：
+    3. 禁止输出任何星号"*"
+    4. 严格参考以下格式：
         1. ⚔️AI 助手的 "硬件实体"，还能怎么变？
         链接：https://www.huxiu.com/article/4838118.html?f=rss
         概况：探讨 AI 助手硬件形态的创新发展，分析 AI 与硬件结合的新趋势和可能性。
@@ -178,7 +187,7 @@ def fetch_github_repos():
         # 4. 调用大模型 (单次请求处理所有项目)
         llm_headers = {"Authorization": f"Bearer {LLM_API_KEY}", "Content-Type": "application/json"}
         payload = {
-            "model": "deepseek-ai/DeepSeek-V3",
+            "model": "deepseek-ai/DeepSeek-V3.2",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.5
         }
