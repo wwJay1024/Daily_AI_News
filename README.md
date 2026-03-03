@@ -14,8 +14,9 @@
 ## 🚀 快速开始
 
 ### 环境要求
-- Python 3.8+
-- 依赖库：`requests`, `beautifulsoup4`
+- Python 3.10+
+- 一个 LLM API Key
+- 一个飞书机器人 Webhook
 
 ### 安装步骤
 
@@ -27,13 +28,37 @@ cd Daily_AI_News
 # 安装依赖
 pip install -r requirements.txt
 
-# 飞书 Webhook URL（必需）
-FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+# 配置环境变量
+export FEISHU_WEBHOOK="你的飞书webhook"
+export LLM_API_KEY="你的LLM_API_KEY"
 
-# LLM API Key（必需）
-LLM_API_KEY=your_siliconflow_api_key
-
+# 运行
+python main.py
 ```
+
+### GitHub Actions 自动定时运行
+1️⃣ 在仓库添加 Secrets  
+进入：  
+Settings → Secrets and variables → Actions → New repository secret  
+添加以下两个：  
+Name	Value  
+FEISHU_WEBHOOK —— 你的飞书机器人 webhook  
+LLM_API_KEY —— 你的LLM API Key  
+⚠️ 必须添加到 Secrets，不要添加到 Variables。  
+
+2️⃣ 定时规则说明  
+在 .github/workflows/schedule.yml 中：  
+cron: '0 0 * * *'  
+表示：  
+UTC 00:00 = 北京时间 08:00  
+UTC 01:00 = 北京时间 09:00  
+如果要修改时间，可自行调整 cron。  
+
+3️⃣ 手动测试  
+进入仓库 → Actions →  
+选择 workflow → 点击 Run workflow  
+查看日志确认是否运行成功。  
+
 
 ### 日报示例
 🤖 AI 日报 2026-03-03
@@ -58,26 +83,6 @@ LLM_API_KEY=your_siliconflow_api_key
 5. ⚙️编程奇点逼近，程序员斩杀线就在眼前，软件版YouTube时刻在发生  
    链接：https://36kr.com/p/3706354539901061  
    概况：AI编程将极大降低开发门槛，预示“人人都是开发者”的软件生产革命。
-
-6. 🕵️19岁天才愤然离开OpenAI，揭国防合同血泪内幕，AI竟成为战争噩梦  
-   链接：https://36kr.com/p/3706352834982281  
-   概况：OpenAI涉足军事应用引发伦理争议，暴露AI技术用于战争的现实与风险。
-
-7. 🤖2028，人形机器人的「生死线」  
-   链接：https://36kr.com/p/3705675262603650  
-   概况：为人形机器人商业化设定明确时间节点，预示行业将进入关键验证期。
-
-8. 💸总额近35亿元，两家上春晚的具身智能公司同日官宣新融资  
-   链接：https://36kr.com/p/3705734996324487  
-   概况：巨额资本涌入具身智能赛道，显示市场对机器人产业化的极高期待。
-
-9. 🌐印度光伏巨头携千亿美金入局：算力“地理大迁徙”时代开启  
-   链接：https://36kr.com/p/3705616813863681  
-   概况：千亿资本推动算力中心全球转移，应对能源危机，重塑地缘竞争。
-
-10. 🛡️春节AI红包，本质是一场大规模微数据收割行动  
-链接：https://36kr.com/p/3706457864777857  
-概况：揭示节日AI应用背后的数据收集本质，引发对隐私与数据价值的深度思考。
 
 💻 AI 开源项目
 1. 🛡️safepilot - AI安全执行助手  
