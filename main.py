@@ -1,7 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+load_dotenv()
 import os
+import re
 
 # ================= 配置区 =================
 FEISHU_WEBHOOK = os.getenv("FEISHU_WEBHOOK")
@@ -12,6 +15,51 @@ TARGET_URL = "https://36kr.com/information/AI/"
 # ================= 辅助函数 =================
 
 # ================= 数据获取模块 =================
+
+def parse_llm_output_to_feishu_post(llm_text, section_title):
+    """
+    将大模型输出解析为飞书 post 富文本结构
+    标题嵌入为超链接
+    """
+    pattern = re.compile(
+    r"\d+\.\s*(.*?)\s*[\n\r]+.*?链接[:：]\s*(https?://[^\s]+)\s*[\n\r]+.*?概况[:：]\s*(.*?)(?=\n\d+\.|\Z)",
+    re.S
+)
+
+    matches = pattern.findall(llm_text)
+
+    content_blocks = []
+
+    # 添加分区标题
+    content_blocks.append([
+        {
+            "tag": "text",
+            "text": f"\n{section_title}\n"
+        }
+    ])
+
+    for title, link, summary in matches:
+        title = title.strip()
+        summary = summary.strip()
+
+        # 标题作为超链接
+        content_blocks.append([
+            {
+                "tag": "a",
+                "text": title,
+                "href": link
+            }
+        ])
+
+        # 概况
+        content_blocks.append([
+            {
+                "tag": "text",
+                "text": f"{summary}\n"
+            }
+        ])
+
+    return content_blocks
 
 def get_36kr_ai_news():
     """解析36氪AI频道页面"""
@@ -65,8 +113,8 @@ def filter_and_summarize_with_ai(articles):
     2. 概况要求：根据新闻标题及摘要总结新闻价值，字数在 30 字以内。
     3. 严格参考以下格式：
         1. ⚔️AI 助手的 "硬件实体"，还能怎么变？
-           链接：https://www.huxiu.com/article/4838118.html?f=rss
-           概况：探讨 AI 助手硬件形态的创新发展，分析 AI 与硬件结合的新趋势和可能性。
+        链接：https://www.huxiu.com/article/4838118.html?f=rss
+        概况：探讨 AI 助手硬件形态的创新发展，分析 AI 与硬件结合的新趋势和可能性。
     
     待筛选内容：
     {raw_content}
@@ -120,8 +168,8 @@ def fetch_github_repos():
         3. 项目之间空一行
         4. 严格参考以下格式：
            1. 🛠️infra-skills - AI 基础设施技能增强
-              链接：https://github.com/xxx
-              概况：使用 AI 技术检测植物病害，为西努沙登加拉农民提供智能解决方案，促进农作物健康和提高产量。
+           链接：https://github.com/xxx
+           概况：使用 AI 技术检测植物病害，为西努沙登加拉农民提供智能解决方案，促进农作物健康和提高产量。
            
         待处理项目：
         {raw_content}
@@ -172,48 +220,58 @@ def format_projects_basic(items):
 
 # ================= 发送与组装模块 =================
 
-def send_to_feishu(content_text):
+def send_to_feishu(post_content):
     """发送消息到飞书群"""
     payload = {
-        "msg_type": "text",
+        "msg_type": "post",
         "content": {
-            "text": content_text
+            "post": {
+                "zh_cn": {
+                    "title": f"🤖 AI 日报 {datetime.now().strftime('%Y-%m-%d')}",
+                    "content": post_content
+                }
+            }
         }
     }
+
     response = requests.post(FEISHU_WEBHOOK, json=payload)
+
     if response.status_code == 200 and response.json().get("code") == 0:
-        print("✅ 飞书消息发送成功")
+        print("✅ 飞书富文本发送成功")
     else:
         print(f"❌ 发送失败: {response.text}")
 
 def main():
     print("开始抓取今日 AI 资讯...")
     today_str = datetime.now().strftime("%Y-%m-%d")
+
     # 抓取36kr新闻
     articles = get_36kr_ai_news()
     tech_news = filter_and_summarize_with_ai(articles)
+
     # 抓取github开源项目
-    github = fetch_github_repos()
-    
-    # 组装最终文本
-    report_lines = [f"🤖 AI 日报 {today_str}"]
-    
+    github_raw_list = fetch_github_repos()
+    github_raw = "\n".join(github_raw_list) if github_raw_list else ""
+
+    # 解析为飞书富文本结构
+    final_content = []
+
     if tech_news:
-        report_lines.append("\n🚀 AI 技术新闻")
-        report_lines.append(tech_news)
-        
-        
-    if github:
-        report_lines.append("\n💻 AI 开源项目")
-        report_lines.extend(github)
-        
-    final_report = "\n".join(report_lines)
-    
-    print("\n生成日报如下：\n" + "="*40)
-    print(final_report)
-    print("="*40)
-    
-    send_to_feishu(final_report)
+        tech_blocks = parse_llm_output_to_feishu_post(
+            tech_news,
+            "🚀 AI 技术新闻"
+        )
+        final_content.extend(tech_blocks)
+
+    if github_raw:
+        github_blocks = parse_llm_output_to_feishu_post(
+            github_raw,
+            "💻 AI 开源项目"
+        )
+        final_content.extend(github_blocks)
+
+    # 4️⃣ 发送
+    send_to_feishu(final_content)
 
 if __name__ == "__main__":
     main()
