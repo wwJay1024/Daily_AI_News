@@ -1,28 +1,29 @@
-# 🤖 Daily AI News - AI 日报生成器
+# Daily AI News
 
-一个自动聚合 AI 行业最新资讯和热门开源项目的日报生成工具，每日自动抓取 **36氪 AI 频道**的最新新闻和 **GitHub** 热门 AI 项目，利用大模型智能筛选和总结，最终发送到飞书群聊。
+## Project Overview
+The Daily AI News project aims to provide regular updates on the latest advancements in artificial intelligence, including research breakthroughs, industry trends, and noteworthy applications. The goal is to keep tech enthusiasts, researchers, and general audiences informed about AI developments.
 
-## ✨ 项目特色
+## Features
+- **Daily Updates:** Get the latest news on AI delivered daily.
+- **Comprehensive Coverage:** Includes research papers, product releases, and use cases.
+- **User-friendly Interface:** Easy navigation and search functionality for quick access to news articles.
 
-- **🌐 多源聚合**：同时获取 36 氪科技新闻和 GitHub 开源项目
-- **🤖 AI 智能筛选**：使用深度学习模型（DeepSeek）进行内容筛选和总结
-- **📱 飞书集成**：自动将日报发送到飞书群聊
-- **🎯 高价值聚焦**：从众多信息中筛选出最有影响力的 Top 10 新闻
-- **⚡ 全自动流程**：支持 GitHub Actions 定时运行
-- **📊 结构化输出**：带 Emoji 和格式化的专业日报展示
+## How to Use
+1. **Clone the Repository:**
+   ```
+   git clone https://github.com/wwJay1024/Daily_AI_News.git
+   ```
+2. **Navigate to the Project Directory:**
+   ```
+   cd Daily_AI_News
+   ```
+3. **Run the Project:** Follow the specific instructions provided in the documentation for running the application.
 
-## 🚀 快速开始
+## Contribution Guidelines
+We welcome contributions from the community. Please fork the repository and submit a pull request with your proposed changes.
 
-### 环境要求
-- Python 3.8+
-- 依赖库：`requests`, `beautifulsoup4`
+## License
+This project is licensed under the MIT License. See the LICENSE file for more details.
 
-### 安装步骤
-
-```bash
-# 克隆仓库
-git clone https://github.com/wwJay1024/Daily_AI_News.git
-cd Daily_AI_News
-
-# 安装依赖
-pip install -r requirements.txt
+## Contact
+For any inquiries, contact [your_email@example.com](mailto:your_email@example.com).
