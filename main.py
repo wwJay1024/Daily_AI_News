@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 load_dotenv()
 import os
-import re
+import json
 
 # ================= 配置区 =================
 FEISHU_WEBHOOK = os.getenv("FEISHU_WEBHOOK")
@@ -16,17 +16,41 @@ TARGET_URL = "https://36kr.com/information/AI/"
 
 # ================= 数据获取模块 =================
 
-def parse_llm_output_to_feishu_post(llm_text, section_title):
+def _extract_json_from_llm_output(llm_output):
     """
-    将大模型输出解析为飞书 post 富文本结构
-    标题嵌入为超链接
+    从 LLM 返回文本中提取 JSON（兼容 ```json 包裹）
     """
-    pattern = re.compile(
-    r"\d+\.\s*(.*?)\s*[\n\r]+.*?链接[:：]\s*(https?://[^\s]+)\s*[\n\r]+.*?概况[:：]\s*(.*?)(?=\n\d+\.|\Z)",
-    re.S
-)
+    if not llm_output:
+        return []
 
-    matches = pattern.findall(llm_text)
+    content = llm_output.strip()
+    if content.startswith("```"):
+        lines = content.splitlines()
+        if len(lines) >= 3 and lines[0].startswith("```") and lines[-1].strip() == "```":
+            content = "\n".join(lines[1:-1]).strip()
+            if content.startswith("json"):
+                content = content[4:].strip()
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        decoder = json.JSONDecoder()
+        start_positions = [idx for idx, ch in enumerate(content) if ch in "[{"]
+        for start in start_positions:
+            try:
+                parsed, _ = decoder.raw_decode(content[start:])
+                return parsed
+            except json.JSONDecodeError:
+                continue
+    return []
+
+
+def build_feishu_post_blocks(items, section_title):
+    """
+    将结构化项目列表转换为飞书 post 富文本结构
+    """
+    if not isinstance(items, list):
+        return []
 
     content_blocks = []
 
@@ -38,9 +62,13 @@ def parse_llm_output_to_feishu_post(llm_text, section_title):
         }
     ])
 
-    for title, link, summary in matches:
-        title = title.strip()
-        summary = summary.strip()
+    for item in items:
+        title = str(item.get("title", "")).strip().replace("**", "")
+        link = str(item.get("link", "")).strip()
+        summary = str(item.get("summary", "")).strip().replace("**", "")
+
+        if not title or not link or not summary:
+            continue
 
         # 标题作为超链接
         content_blocks.append([
@@ -106,9 +134,9 @@ def get_36kr_ai_news():
         return []
 
 def filter_and_summarize_with_ai(articles):
-    """利用大模型从大量新闻中筛选 Top 10 并总结"""
+    """利用大模型从大量新闻中筛选 Top 10 并总结，返回结构化 JSON 列表"""
     if not articles:
-        return "未能抓取到今日新闻。"
+        return []
 
     # 将文章列表转为文本交给 AI
     raw_content = "\n".join([f"标题: {a['title']}\n摘要: {a['description']}\n链接: {a['link']}\n---" for a in articles])
@@ -117,13 +145,12 @@ def filter_and_summarize_with_ai(articles):
     你是一个顶级的AI行业分析师。从以下AI相关新闻中筛选出10条最具突破性、冲击性、价值最大的新闻。
     
     输出要求：
-    1. 项目整理格式：[序号.][匹配的Emoji][标题] + [链接] + [概况]
-    2. 概况要求：根据新闻标题及摘要总结新闻价值，字数在 30 字以内。
-    3. 禁止输出任何星号"*"
-    4. 严格参考以下格式：
-        1. ⚔️AI 助手的 "硬件实体"，还能怎么变？
-        链接：https://www.huxiu.com/article/4838118.html?f=rss
-        概况：探讨 AI 助手硬件形态的创新发展，分析 AI 与硬件结合的新趋势和可能性。
+    1. 只返回 JSON 数组，不要返回任何额外文字、markdown、注释。
+    2. 数组每个元素必须是对象：{{"title":"", "link":"", "summary":""}}
+    3. title 为“Emoji + 标题”，不要序号。
+    4. link 使用原文链接。
+    5. summary 根据新闻标题及摘要总结新闻价值，30字以内。
+    6. 返回 10 条。
     
     待筛选内容：
     {raw_content}
@@ -138,13 +165,18 @@ def filter_and_summarize_with_ai(articles):
 
     try:
         res = requests.post(f"{LLM_BASE_URL}/chat/completions", json=payload, headers=headers)
-        return res.json()['choices'][0]['message']['content']
+        llm_output = res.json()['choices'][0]['message']['content']
+        parsed = _extract_json_from_llm_output(llm_output)
+        if isinstance(parsed, list):
+            return parsed
+        return []
     except Exception as e:
-        return f"AI 筛选失败: {e}"
+        print(f"AI 筛选失败: {e}")
+        return []
 
 
 def fetch_github_repos():
-    """通过 GitHub API 获取今日热门 AI 开源项目"""
+    """通过 GitHub API 获取今日热门 AI 开源项目，返回结构化 JSON 列表"""
     # 搜索过去一周创建的，包含 ai topic 的项目，按 star 排序
     date_str = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     url = f"https://api.github.com/search/repositories?q=topic:ai+created:>{date_str}&sort=stars&order=desc"
@@ -172,13 +204,12 @@ def fetch_github_repos():
         你是一个资深的开源项目分析师。将以下 GitHub AI 项目翻译并整理格式。
         
         输出要求：
-        1. 项目整理格式：[序号.][匹配的Emoji][项目原名] - [中文项目名] + [项目链接] + [项目概况]
-        2. 概况要求：根据原描述总结其核心功能与价值，字数在 40 字以内。
-        3. 项目之间空一行
-        4. 严格参考以下格式：
-           1. 🛠️infra-skills - AI 基础设施技能增强
-           链接：https://github.com/xxx
-           概况：使用 AI 技术检测植物病害，为西努沙登加拉农民提供智能解决方案，促进农作物健康和提高产量。
+        1. 只返回 JSON 数组，不要返回任何额外文字、markdown、注释。
+        2. 数组每个元素必须是对象：{{"title":"", "link":"", "summary":""}}
+        3. title 格式为“Emoji + 项目原名 - 中文项目名”，不要序号。
+        4. link 使用项目链接。
+        5. summary 根据原描述总结核心功能与价值，40字以内。
+        6. 返回 5 条。
            
         待处理项目：
         {raw_content}
@@ -196,8 +227,11 @@ def fetch_github_repos():
             res = requests.post(f"{LLM_BASE_URL}/chat/completions", json=payload, headers=llm_headers, timeout=20)
             if res.status_code == 200:
                 llm_output = res.json()['choices'][0]['message']['content'].strip()
-                # 返回处理后的字符串列表（按行拆分或直接作为整段返回）
-                return [llm_output]
+                parsed = _extract_json_from_llm_output(llm_output)
+                if isinstance(parsed, list):
+                    return parsed
+                print("LLM 返回非 JSON 数组，使用原始项目信息")
+                return format_projects_basic(items)
             else:
                 print(f"LLM API 返回错误代码: {res.status_code}, 使用原始项目信息")
                 # LLM 失败时，返回原始格式的项目信息
@@ -213,19 +247,22 @@ def fetch_github_repos():
 
 
 def format_projects_basic(items):
-    """当LLM调用失败时，返回项目的基本格式"""
+    """当LLM调用失败时，返回项目的基础结构化格式"""
     if not items:
         return []
     
     formatted_projects = []
-    for i, item in enumerate(items, 1):
+    for item in items:
         desc = item.get('description', '暂无描述')
         if desc and len(desc) > 40:
             desc = desc[:40] + '...'
-        project_info = f"{i}. {item['name']}\n   链接：{item['html_url']}\n   概况：{desc}"
-        formatted_projects.append(project_info)
+        formatted_projects.append({
+            "title": item['name'],
+            "link": item['html_url'],
+            "summary": desc
+        })
     
-    return ["\n\n".join(formatted_projects)]   
+    return formatted_projects
 
 # ================= 发送与组装模块 =================
 
@@ -259,22 +296,21 @@ def main():
     tech_news = filter_and_summarize_with_ai(articles)
 
     # 抓取github开源项目
-    github_raw_list = fetch_github_repos()
-    github_raw = "\n".join(github_raw_list) if github_raw_list else ""
+    github_items = fetch_github_repos()
 
     # 解析为飞书富文本结构
     final_content = []
 
     if tech_news:
-        tech_blocks = parse_llm_output_to_feishu_post(
+        tech_blocks = build_feishu_post_blocks(
             tech_news,
             "🚀 AI 技术新闻"
         )
         final_content.extend(tech_blocks)
 
-    if github_raw:
-        github_blocks = parse_llm_output_to_feishu_post(
-            github_raw,
+    if github_items:
+        github_blocks = build_feishu_post_blocks(
+            github_items,
             "💻 AI 开源项目"
         )
         final_content.extend(github_blocks)
