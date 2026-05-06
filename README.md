@@ -47,10 +47,9 @@ LLM_API_KEY —— 你的LLM API Key
 
 2️⃣ 定时规则说明  
 在 .github/workflows/schedule.yml 中：  
-cron: '0 0 * * *'  
-表示：  
-UTC 00:00 = 北京时间 08:00  
-UTC 01:00 = 北京时间 09:00  
+cron: '30 0 * * *'
+表示：
+UTC 00:30 = 北京时间 08:30
 如果要修改时间，可自行调整 cron。  
 
 3️⃣ 手动测试  
